@@ -59,7 +59,7 @@ class VGGNormLayer(torch.nn.Module):
 
 
 
-def perceptual_loss(x, y, net, norm=None, greedy_val = False):
+def perceptual_loss(x, y, net, norm=None):
     if norm is not None:
         x = norm(x)
         y = norm(y)
@@ -81,7 +81,5 @@ def perceptual_loss(x, y, net, norm=None, greedy_val = False):
 
         d = torch.mean(torch.sum((f1_l_norm - f2_l_norm)**2, dim=1), dim=(1, 2))  # bx1
 
-        loss = d if l == 0 else loss + d 
-    if greedy_val:
-        return loss/n_layers
-    return torch.mean(loss/n_layers)
+        loss = d if l == 0 else loss + d
+    return loss/n_layers

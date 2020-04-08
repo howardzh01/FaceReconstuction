@@ -1,59 +1,45 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
-import celeba_data_loader_multirand as celeba_data_loader
+import stl10_data_loader as data_loader
 import network1 as network
-from time import time
 from vgg import vgg16, VGGNormLayer, perceptual_loss
+from argparse import ArgumentParser
+
 torch.backends.cudnn.benchmark = True
-
-
 log_interval = 200
-device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-device_ids = [2, 3, 4, 5, 6]
-vgg_net = nn.DataParallel(vgg16().to(device), device_ids=device_ids)
-vgg_norm = VGGNormLayer().to(device)
 
-def train(net, optimizer, train_loader, epoch, device, f=None):
+
+def train(net, optimizer, train_loader, epoch, device):
     train_loss = 0
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
         optimizer.zero_grad()
-        output = net(data)
-        loss = perceptual_loss(output, target, vgg_net, vgg_norm)
-        loss.backward() #computes gradients
-        optimizer.step() #updates parameters
+        loss = torch.mean(net(data, target))
+        loss.backward()  # computes gradients
+        optimizer.step()  # updates parameters
         if batch_idx % log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                        100 * batch_idx / len(train_loader), loss.item()))
         train_loss += loss.item()
     train_loss /= len(train_loader)
-    if f is not None:
-        f.write('\nTrain Epoch: {} \nTrain set: Avg. loss: {:.4f}'.format(epoch, train_loss))
-        print('\nTrain set: Avg. loss: {:.4f}\n'.format(train_loss))
+    print('\nTrain set: Avg. loss: {:.4f}\n'.format(train_loss))
     return train_loss
 
 
-def val(net, val_loader, device, f = None, num_batches=None):
+def val(net, val_loader, device):
     net.eval()
     val_loss = 0
-    count = 0
     with torch.no_grad():
         for data, target in val_loader:
             data, target = data.to(device, non_blocking=True), target.to(device, non_blocking=True)
-            output = net(data)
-            val_loss += perceptual_loss(output, target, vgg_net, vgg_norm)
-            count += 1
-            if num_batches is not None and num_batches == count:
-                break
-    val_loss /= count
-    if f is not None:
-        f.write('\nVal set: Avg. loss: {:.4f}\n'.format(
-            val_loss))
+            val_loss += torch.mean(net(data, target)).item()
+    val_loss /= len(val_loader)
+    print('\nVal set: Avg. loss: {:.4f}\n'.format(val_loss))
     return val_loss
+
 
 def save_graph(path, train_losses, val_losses, counter):
     plt.figure(figsize=(16, 8))
@@ -62,51 +48,76 @@ def save_graph(path, train_losses, val_losses, counter):
     plt.scatter(counter, train_losses,
                 color='blue')
     plt.scatter(counter, val_losses, color='red')
-    plt.suptitle("Network1 Train/Val Loss for 32x32 patch")
+    plt.suptitle("Network1 Train/Val Loss for 12x12 patch")
     plt.legend(['Train Loss', 'Val Loss'], loc='upper right')
     plt.xlabel('number of epochs')
     plt.ylabel('Perceptual loss')
     plt.savefig(path)
 
+
 if __name__ == '__main__':
-    best_loss = float('inf')
-    batch_size_train = 32
-    batch_size_test = 32
-    learning_rate = 1e-4
-    n_epochs = 90
-    t0 = time()
-    patch_size = (32, 32)
-    train_loader = celeba_data_loader.get_img_loader("/data/vision/billf/scratch/balakg/celeba_hq/images_256x256",  patch_size, batch_size_train, "train", num_rand = 25)
-    val_loader = celeba_data_loader.get_img_loader("/data/vision/billf/scratch/balakg/celeba_hq/images_256x256",  patch_size, batch_size_test, "val", num_rand = 25)
-    train_losses = []
-    val_losses = []
-    counter = []
-    print(len(val_loader.dataset))  # 1000
-    print(len(train_loader.dataset))  # 28000
-    t1 = time()
-    net = network.Net()
+    parser = ArgumentParser()
+
+    parser.add_argument("--gpus", type=int, nargs='+', default=list(range(torch.cuda.device_count())), help="gpus")
+
+    parser.add_argument("--eps", type=int, default=20, help="number of epochs")
+
+    parser.add_argument("--psize", type=int, default=32, help="patch size")
+
+    parser.add_argument("--btsize", type=int, default=32, help="batch size train")
+
+    parser.add_argument("--bvsize", type=int, default=32, help="batch size val")
+
+    parser.add_argument("--dataset", type=str, default='celeba', help="name of dataset")
+
+    parser.add_argument("--datapath", type=str, help="path to data set")
+
+    parser.add_argument()
+
+    opt = parser.parse_args()
+
+    device = torch.device("cuda:{}".format(opt.gpus[0]) if torch.cuda.is_available() else "cpu")
+    device_ids, n_epochs, patch_size = opt.gpus, opt.eps, (opt.psize, opt.psize),
+    batch_size_train, batch_size_test = opt.btsize, opt.bvsize
+
+    # data loader
+    if opt.dataset == 'celeba':
+        loader = data_loader.get_celeba_loader
+    elif opt.dataset == 'FFHQ':
+        loader = data_loader.get_ffhq_loader
+    else:
+        loader = data_loader.get_stl_loader
+    train_loader = loader(opt.datapath, patch_size, batch_size_train, "train", num_rand=25)
+    val_loader = loader(opt.datapath, patch_size, batch_size_test, "val", num_rand=25)
+
+    # initialize network and optimizer
+    net = network.FullModel(network.Net(), perceptual_loss, vgg16(), VGGNormLayer())
     if torch.cuda.device_count() > 1:
-        print("Let's use", len(device_ids), "GPUs!")
         net = nn.DataParallel(net, device_ids=device_ids)
     net.to(device)
-    optimizer = optim.Adam(net.parameters(), lr=learning_rate)
-    f = open("results/network1/network1_log.txt", "w")
-    f.write("network1 perceptual loss \n")
-    f.write("train on 100 random 32x32 patches\n")
-    val(net, val_loader, device, f)
-    print("val time is {} minutes".format((time() - t1)/60))
-    for epoch in range(1, n_epochs + 1):
-        train_loss = train(net, optimizer, train_loader, epoch, device, f)
-        train_losses.append(train_loss)
-        loss = val(net, val_loader, device, f)
-        val_losses.append(loss)
-        counter.append(epoch)
-        print('Minutes elapsed is {}'.format((time() - t1) / 60))
-        print('\nVal set: Avg. loss: {:.4f}\n'.format(
-            loss))
-        if loss < best_loss:
-            best_loss = loss
-            torch.save({'epoch': epoch, 'state_dict': net.module.state_dict(), 'perceptual_loss': best_loss}, 'results/network1/network1_model.pth')
-    save_graph("results/network1/network1_train_loss_graph.png", train_losses, val_losses, counter)
-    f.close()
+    optimizer = optim.Adam(net.parameters(), lr=1e-4)
 
+    # train/validation loop + log results
+    best_loss = float('inf')
+    train_losses, val_losses, counter = [], [], []
+    val_loss = val(net, val_loader, device)
+    with open("results/network1/network1_log.txt", "w") as f:
+        f.write("network1 perceptual loss \n")
+        f.write("train on 100 random 12x12 patches\n")
+        f.write(f"{val_loss}")
+    for epoch in range(1, n_epochs + 1):
+        train_loss = train(net, optimizer, train_loader, epoch, device)
+        train_losses.append(train_loss)
+        val_loss = val(net, val_loader, device)
+        val_losses.append(val_loss)
+        counter.append(epoch)
+        with open("results/network1/network1_log.txt", "a+") as f:
+            f.write('\nTrain Epoch: {} \nTrain set: Avg. loss: {:.4f}'.format(epoch, train_loss))
+            f.write('\nVal set: Avg. loss: {:.4f}\n'.format(val_loss))
+            if epoch == n_epochs:
+                f.write('\nEpoch Counter, Train Loss, Val Loss\n{}\n{}\n{}\n'.format(counter, train_losses, val_losses))
+        if val_loss < best_loss:
+            best_loss = val_loss
+            torch.save({'epoch': epoch, 'state_dict': net.module.state_dict(), 'perceptual_loss': best_loss},
+                       'results/network1/network1_model.pth')
+        save_graph("results/network1/network1_train_loss_graph.png", train_losses, val_losses, counter)

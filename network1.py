@@ -1,18 +1,16 @@
-import torch
 import torch.nn as nn
 from unet import *
 
-#32x32
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        #start with 256 x 256 x 3
-        self.inc = DoubleConv(4, 64, 4, padding=2, leaky_slope=0.2) #256
-        self.down1 = DoubleConv(64, 128, 4, padding=2, stride=2, leaky_slope=0.2) #128
-        self.down2 = DoubleConv(128, 256, 4, padding=2, stride=2, leaky_slope=0.2) #64
-        self.down3 = DoubleConv(256, 256, 4, padding=2, stride=2, leaky_slope=0.2) #32
-        self.down4 = DoubleConv(256, 256, 4, padding=2, stride=2, leaky_slope=0.2) #16
-        self.down5 = DoubleConv(256, 256, 4, padding=2, leaky_slope=0.2)  #16
+        # start with 4 channels (3 for image and 1 for mask)
+        self.inc = DoubleConv(4, 64, 4, padding=2, leaky_slope=0.2)
+        self.down1 = DoubleConv(64, 128, 4, padding=2, stride=2, leaky_slope=0.2)
+        self.down2 = DoubleConv(128, 256, 4, padding=2, stride=2, leaky_slope=0.2)
+        self.down3 = DoubleConv(256, 256, 4, padding=2, stride=2, leaky_slope=0.2)
+        self.down4 = DoubleConv(256, 256, 4, padding=2, stride=2, leaky_slope=0.2)
+        self.down5 = DoubleConv(256, 256, 4, padding=2, leaky_slope=0.2)
         self.up0 = UpConv(512, 256, 4, padding=2, scale_factor=2)
         self.up1 = UpConv(512, 256, 4, padding=2, scale_factor=2)
         self.up2 = UpConv(512, 128, 4, padding=2, scale_factor=2)
@@ -33,16 +31,16 @@ class Net(nn.Module):
         x = self.up4(x, x1)
         return self.outc(x)
 
+
 class FullModel(nn.Module):
-  def __init__(self, model, loss, loss_model, norm, is_greedy=False):
+  def __init__(self, model, loss, loss_model, norm):
     super(FullModel, self).__init__()
     self.model = model
     self.loss = loss
     self.loss_model = loss_model
     self.norm = norm
-    self.is_greedy = is_greedy
 
   def forward(self, input, target):
     output = self.model(input)
-    loss = self.loss(output, target, self.loss_model, self.norm, self.is_greedy)
+    loss = self.loss(output, target, self.loss_model, self.norm)
     return loss
