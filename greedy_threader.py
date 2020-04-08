@@ -87,12 +87,10 @@ if __name__ == '__main__':
 
     parser.add_argument("--modelpath", type=str, help="path to pre-trained model weight")
 
-    parser.add_argument()
-
     opt = parser.parse_args()
 
     device = torch.device("cuda:{}".format(opt.gpus[0]) if torch.cuda.is_available() else "cpu")
-    device_ids, n_epochs, patch_size, batch_size = opt.gpus, opt.eps, (opt.psize, opt.psize), opt.bvsize
+    device_ids, patch_size, batch_size = opt.gpus, (opt.psize, opt.psize), opt.bvsize
 
     # initialize trained network
     cnet = network.Net()

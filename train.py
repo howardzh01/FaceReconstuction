@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
-import stl10_data_loader as data_loader
+import data_loader
 import network1 as network
 from vgg import vgg16, VGGNormLayer, perceptual_loss
 from argparse import ArgumentParser
@@ -48,7 +48,7 @@ def save_graph(path, train_losses, val_losses, counter):
     plt.scatter(counter, train_losses,
                 color='blue')
     plt.scatter(counter, val_losses, color='red')
-    plt.suptitle("Network1 Train/Val Loss for 12x12 patch")
+    plt.suptitle("Network1 Train/Val Loss for 32x32 patch")
     plt.legend(['Train Loss', 'Val Loss'], loc='upper right')
     plt.xlabel('number of epochs')
     plt.ylabel('Perceptual loss')
@@ -71,8 +71,6 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", type=str, default='celeba', help="name of dataset")
 
     parser.add_argument("--datapath", type=str, help="path to data set")
-
-    parser.add_argument()
 
     opt = parser.parse_args()
 
