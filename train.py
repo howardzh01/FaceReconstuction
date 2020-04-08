@@ -103,7 +103,7 @@ if __name__ == '__main__':
     val_loss = val(net, val_loader, device)
     with open("results/network1/network1_log.txt", "w") as f:
         f.write("network1 perceptual loss \n")
-        f.write("train on 100 random 12x12 patches\n")
+        f.write("train on 25 random 12x12 patches\n")
         f.write(f"{val_loss}")
     for epoch in range(1, n_epochs + 1):
         train_loss = train(net, optimizer, train_loader, epoch, device)
