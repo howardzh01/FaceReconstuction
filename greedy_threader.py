@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--datapath", type=str, help="path to data set")
 
-    parser.add_argument("--modelpath", type=str, help="path to pre-trained model weight")
+    parser.add_argument("--modelpath", type=str, help="path to pre-trained weights")
 
     opt = parser.parse_args()
 

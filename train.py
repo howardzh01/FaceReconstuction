@@ -89,7 +89,8 @@ if __name__ == '__main__':
     val_loader = loader(opt.datapath, patch_size, batch_size_test, "val", num_rand=25)
 
     # initialize network and optimizer
-    net = network.FullModel(network.Net(), perceptual_loss, vgg16(), VGGNormLayer())
+    unet = network.Net()
+    net = network.FullModel(unet, perceptual_loss, vgg16(), VGGNormLayer())
     if torch.cuda.device_count() > 1:
         net = nn.DataParallel(net, device_ids=device_ids)
     net.to(device)
@@ -116,6 +117,6 @@ if __name__ == '__main__':
                 f.write('\nEpoch Counter, Train Loss, Val Loss\n{}\n{}\n{}\n'.format(counter, train_losses, val_losses))
         if val_loss < best_loss:
             best_loss = val_loss
-            torch.save({'epoch': epoch, 'state_dict': net.module.state_dict(), 'perceptual_loss': best_loss},
+            torch.save({'epoch': epoch, 'state_dict': unet.module.state_dict(), 'perceptual_loss': best_loss},
                        'results/network1/network1_model.pth')
         save_graph("results/network1/network1_train_loss_graph.png", train_losses, val_losses, counter)
