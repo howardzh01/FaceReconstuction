@@ -32,7 +32,7 @@ vgg_norm = VGGNormLayer().to(device)
 cn = network.Net().to(device)
 cn.load_state_dict(torch.load(opt.modelpath, map_location=device)['state_dict'])
 patched_dic = torch.load(opt.dicpath)
-print(patched_dic.keys())
+
 # data loader
 if opt.dataset == 'celeba':
     loader = data_loader.CelebA
