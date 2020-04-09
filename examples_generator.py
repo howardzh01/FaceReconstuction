@@ -12,7 +12,7 @@ parser = ArgumentParser()
 
 parser.add_argument("--psize", type=int, default=32, help="patch size")
 
-parser.add_argument("--image_ids", type=int, nargs='+', default=list(range(5)), help="image ids to display")
+parser.add_argument("--image_ids", type=int, nargs='+', help="image ids to display")
 
 parser.add_argument("--dataset", type=str, default='celeba', help="name of data set")
 
@@ -32,15 +32,18 @@ vgg_norm = VGGNormLayer().to(device)
 cn = network.Net().to(device)
 cn.load_state_dict(torch.load(opt.modelpath, map_location=device)['state_dict'])
 patched_dic = torch.load(opt.dicpath)
-
+print(patched_dic.keys())
 # data loader
 if opt.dataset == 'celeba':
     loader = data_loader.CelebA
+    factor = 28001
 elif opt.dataset == 'FFHQ':
     loader = data_loader.FFHQ
+    factor = 1
 else:
     loader = data_loader.STL10
-img_loader = (opt.datapath, T.ToTensor(), patch_size, 'val', tuple(), None)
+    factor = 1
+img_loader = loader(opt.datapath, T.ToTensor(), patch_size, 'val', tuple(), None)
 
 
 def modify_img(img, target, centers, num):
@@ -56,7 +59,7 @@ def load_img(img_id):
     '''
     assumes first image has id 0
     '''
-    return img_loader[img_id]
+    return img_loader[img_id-factor]
 
 
 def im_choose_show(id_arr):
