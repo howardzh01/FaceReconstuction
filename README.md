@@ -7,4 +7,4 @@ A greedy approach is used to determine which patch locations are optimal for eac
 
 The model consists of Unet architecture trained on a Perceptual Loss function based on VGG-16. 
 
-![](model_weights/celeba_60eps_example2.png)
+![](examples/celeba_60eps_example2.png)
